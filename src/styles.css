@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Oxanium", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Zen Hei",
+    ui-sans-serif, sans-serif;
+  --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Zen Hei", "Oxanium",
+    ui-sans-serif, sans-serif;
+  --color-bg: #070b16;
+  --color-surface: #121a2b;
+  --color-fg: #e7f3ff;
+  --color-muted: #8aa0b8;
+  --color-primary: #3ee0ff;
+  --color-on-primary: #041018;
+  --color-accent: #ffb347;
+  --color-danger: #ff4d8d;
+  --color-ok: #5ee0a0;
+  --color-border: #24364c;
+  --radius: 1rem;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}

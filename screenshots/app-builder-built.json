@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "星键歼灭",
+      "hasCanvas": true,
+      "bodyTextLen": 133,
+      "bodyTextHash": "29e1df3a068f274cd7b86ede196eb861b8715d62e0e866859e8abef742499f43",
+      "bodyTextPrefix": "分数 0 最佳 0 STARTYPE 键盘太空战 星键歼灭 敌舰顶着单词俯冲。敲对字母锁定，打完整个词就把它打下来。 英语 拼音",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "星键歼灭",
+      "hasCanvas": true,
+      "bodyTextLen": 133,
+      "bodyTextHash": "29e1df3a068f274cd7b86ede196eb861b8715d62e0e866859e8abef742499f43",
+      "bodyTextPrefix": "分数 0 最佳 0 STARTYPE 键盘太空战 星键歼灭 敌舰顶着单词俯冲。敲对字母锁定，打完整个词就把它打下来。 英语 拼音",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}
