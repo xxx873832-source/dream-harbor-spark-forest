@@ -172,6 +172,30 @@ var Keyboard = createLucideIcon("keyboard", [
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
+var Music = createLucideIcon("music", [
+	["path", {
+		d: "M9 18V5l12-2v13",
+		key: "1jmyc2"
+	}],
+	["circle", {
+		cx: "6",
+		cy: "18",
+		r: "3",
+		key: "fqmcym"
+	}],
+	["circle", {
+		cx: "18",
+		cy: "16",
+		r: "3",
+		key: "1hluhg"
+	}]
+]);
+/**
+* @license lucide-react v0.510.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
 var Pause = createLucideIcon("pause", [["rect", {
 	x: "14",
 	y: "4",
@@ -319,4 +343,4 @@ var VolumeX = createLucideIcon("volume-x", [
 	}]
 ]);
 //#endregion
-export { Shield as a, Pause as c, TriangleAlert as i, Keyboard as l, Volume2 as n, RotateCcw as o, Trophy as r, Play as s, VolumeX as t, Crosshair as u };
+export { Shield as a, Pause as c, Crosshair as d, TriangleAlert as i, Music as l, Volume2 as n, RotateCcw as o, Trophy as r, Play as s, VolumeX as t, Keyboard as u };

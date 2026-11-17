@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Crosshair, Keyboard, Pause, Play, RotateCcw, Shield, Trophy, Volume2, VolumeX } from "lucide-react";
+import { Crosshair, Keyboard, Music, Pause, Play, RotateCcw, Shield, Trophy, Volume2, VolumeX } from "lucide-react";
 import { AudioBus } from "./audio";
 import { render, type Art } from "./draw";
 import { Game, type Hud } from "./engine";
-import type { Diff, Lang } from "./lexicon";
+import type { Diff, Lang, Mode } from "./lexicon";
 
 const SAVE_KEY = "xingjian-v1";
 
@@ -11,7 +11,9 @@ type Save = {
   best: Record<string, number>;
   lang: Lang;
   diff: Diff;
+  mode: Mode;
   muted: boolean;
+  music: boolean;
 };
 
 const DIFFS: { id: Diff; label: string }[] = [
@@ -19,6 +21,10 @@ const DIFFS: { id: Diff; label: string }[] = [
   { id: "normal", label: "标准" },
   { id: "expert", label: "专家" },
 ];
+
+function bestKey(mode: Mode, lang: Lang, diff: Diff) {
+  return mode === "letter" ? `letter:${diff}` : `${lang}:${diff}`;
+}
 
 function loadSave(): Save | null {
   try {
@@ -30,7 +36,9 @@ function loadSave(): Save | null {
       best: data.best,
       lang: data.lang === "py" ? "py" : "en",
       diff: data.diff === "easy" || data.diff === "expert" ? data.diff : "normal",
+      mode: data.mode === "letter" ? "letter" : "word",
       muted: Boolean(data.muted),
+      music: data.music !== false,
     };
   } catch {
     return null;
@@ -49,7 +57,7 @@ function WordLine({ word, count }: { word: string; count: number }) {
   );
 }
 
-function Keypad({ onKey }: { onKey: (code: string) => void }) {
+function Keypad({ onKey, letter }: { onKey: (code: string) => void; letter: boolean }) {
   const rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
   return (
     <div className="pointer-events-auto border-t border-border bg-bg/90 px-2 pt-2 pb-3 backdrop-blur-md">
@@ -68,7 +76,7 @@ function Keypad({ onKey }: { onKey: (code: string) => void }) {
               {ch}
             </button>
           ))}
-          {row.startsWith("z") ? (
+          {row.startsWith("z") && !letter ? (
             <button
               type="button"
               className="h-11 min-w-12 flex-1 rounded-md border border-border bg-surface px-2 text-sm text-muted"
@@ -97,24 +105,32 @@ export function StarType() {
   const [hud, setHud] = useState<Hud>(() => game.hud());
   const [lang, setLang] = useState<Lang>("en");
   const [diff, setDiff] = useState<Diff>("normal");
+  const [mode, setMode] = useState<Mode>("word");
   const [bestMap, setBestMap] = useState<Record<string, number>>({});
   const [muted, setMuted] = useState(false);
+  const [musicOn, setMusicOn] = useState(true);
   const [touch, setTouch] = useState(false);
   const langRef = useRef(lang);
   const diffRef = useRef(diff);
+  const modeRef = useRef(mode);
   const bestRef = useRef(bestMap);
   const mutedRef = useRef(muted);
+  const musicRef = useRef(musicOn);
   langRef.current = lang;
   diffRef.current = diff;
+  modeRef.current = mode;
   bestRef.current = bestMap;
   mutedRef.current = muted;
+  musicRef.current = musicOn;
 
   function persist(next?: Partial<Save>) {
     const save: Save = {
       best: next?.best ?? bestRef.current,
       lang: next?.lang ?? langRef.current,
       diff: next?.diff ?? diffRef.current,
+      mode: next?.mode ?? modeRef.current,
       muted: next?.muted ?? mutedRef.current,
+      music: next?.music ?? musicRef.current,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(save));
   }
@@ -125,7 +141,7 @@ export function StarType() {
     audio?.handle(events);
     const next = game.hud();
     if (events.some((event) => event.type === "over")) {
-      const key = `${game.lang}:${game.diff}`;
+      const key = bestKey(game.mode, game.lang, game.diff);
       const merged = { ...bestRef.current, [key]: Math.max(bestRef.current[key] ?? 0, game.score) };
       bestRef.current = merged;
       setBestMap(merged);
@@ -136,10 +152,11 @@ export function StarType() {
 
   function begin() {
     audioRef.current?.unlock();
-    const key = `${langRef.current}:${diffRef.current}`;
+    const key = bestKey(modeRef.current, langRef.current, diffRef.current);
     game.configure({
       lang: langRef.current,
       diff: diffRef.current,
+      mode: modeRef.current,
       best: bestRef.current[key] ?? 0,
     });
     game.start();
@@ -151,9 +168,12 @@ export function StarType() {
     if (saved) {
       setLang(saved.lang);
       setDiff(saved.diff);
+      setMode(saved.mode);
       setBestMap(saved.best);
       setMuted(saved.muted);
+      setMusicOn(saved.music);
       audioRef.current?.setMuted(saved.muted);
+      audioRef.current?.setMusic(saved.music);
       bestRef.current = saved.best;
     }
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -193,12 +213,14 @@ export function StarType() {
           const dt = Math.min(0.05, (now - last) / 1000);
           last = now;
           game.update(dt);
+          const scene = game.phase === "play" && game.wave % 5 === 0 ? "boss" : game.phase === "play" ? "play" : "calm";
+          audioRef.current?.setScene(scene);
           render(ctx, cssW, cssH, game, art, reduce.matches);
           const events = game.pullEvents();
           if (events.length) {
             audioRef.current?.handle(events);
             if (events.some((event) => event.type === "over")) {
-              const key = `${game.lang}:${game.diff}`;
+              const key = bestKey(game.mode, game.lang, game.diff);
               const merged = { ...bestRef.current, [key]: Math.max(bestRef.current[key] ?? 0, game.score) };
               bestRef.current = merged;
               setBestMap(merged);
@@ -285,6 +307,7 @@ export function StarType() {
         flush();
       },
       snapshot: () => game.snapshot(),
+      audio: () => audioRef.current?.status() ?? null,
     };
     (window as unknown as { __star?: typeof api }).__star = api;
 
@@ -299,8 +322,17 @@ export function StarType() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game]);
 
-  const best = bestMap[`${lang}:${diff}`] ?? 0;
+  const best = bestMap[bestKey(mode, lang, diff)] ?? 0;
   const showPad = touch && (hud.phase === "play" || hud.phase === "pause");
+
+  function toggleMusic() {
+    const next = !musicRef.current;
+    musicRef.current = next;
+    setMusicOn(next);
+    audioRef.current?.unlock();
+    audioRef.current?.setMusic(next);
+    persist({ music: next });
+  }
 
   function toggleMute() {
     const next = !mutedRef.current;
@@ -338,7 +370,9 @@ export function StarType() {
                       ) : null}
                     </>
                   ) : (
-                    <p className="pt-2 text-sm text-muted">输入字母，锁定敌舰</p>
+                    <p className="pt-2 text-sm text-muted">
+                      {hud.mode === "letter" ? (hud.bossWave ? "连打旗舰上的同一个字母" : "按下舰上的字母") : "输入字母，锁定敌舰"}
+                    </p>
                   )}
                   {hud.slow ? <p className="text-xs text-primary">缓速生效</p> : null}
                 </>
@@ -347,7 +381,20 @@ export function StarType() {
               )}
             </div>
             <div className="flex flex-col items-end gap-2">
-              <div className="pointer-events-auto flex gap-2">
+              <div className="pointer-events-auto flex gap-1">
+                <button
+                  type="button"
+                  className={
+                    musicOn
+                      ? "grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/80 text-primary"
+                      : "grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/80 text-muted"
+                  }
+                  onClick={toggleMusic}
+                  aria-label={musicOn ? "关闭背景音乐" : "打开背景音乐"}
+                  aria-pressed={musicOn}
+                >
+                  <Music className="size-5" />
+                </button>
                 <button
                   type="button"
                   className="grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/80 text-fg"
@@ -404,37 +451,66 @@ export function StarType() {
 
           {hud.phase === "menu" ? (
             <div className="absolute inset-0 flex items-center justify-center p-4">
-              <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-border bg-surface/90 p-6 shadow-2xl backdrop-blur-md">
+              <div className="pointer-events-auto max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-surface/90 p-6 shadow-2xl backdrop-blur-md">
                 <p className="text-xs tracking-widest text-primary">键盘太空战</p>
                 <h1 className="font-display text-5xl font-bold leading-none">星键歼灭</h1>
                 <p className="mt-3 text-sm leading-6 text-muted">
-                  敌舰顶着单词俯冲。敲对字母锁定，打完整个词就把它打下来。
+                  {mode === "letter"
+                    ? "每艘敌舰只有一个字母。按中就击落，同屏不会重复。旗舰要连打同一个字母。"
+                    : "敌舰顶着单词俯冲。敲对字母锁定，打完整个词就把它打下来。"}
                 </p>
                 <div className="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-bg p-1">
                   {(
                     [
-                      ["en", "英语"],
-                      ["py", "拼音"],
+                      ["word", "单词"],
+                      ["letter", "单字母"],
                     ] as const
                   ).map(([id, label]) => (
                     <button
                       key={id}
                       type="button"
                       className={
-                        lang === id
+                        mode === id
                           ? "h-11 rounded-lg bg-primary font-medium text-on-primary"
                           : "h-11 rounded-lg text-muted"
                       }
                       onClick={() => {
-                        setLang(id);
-                        langRef.current = id;
-                        persist({ lang: id });
+                        setMode(id);
+                        modeRef.current = id;
+                        persist({ mode: id });
                       }}
                     >
                       {label}
                     </button>
                   ))}
                 </div>
+                {mode === "word" ? (
+                  <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-bg p-1">
+                    {(
+                      [
+                        ["en", "英语"],
+                        ["py", "拼音"],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={
+                          lang === id
+                            ? "h-11 rounded-lg bg-primary font-medium text-on-primary"
+                            : "h-11 rounded-lg text-muted"
+                        }
+                        onClick={() => {
+                          setLang(id);
+                          langRef.current = id;
+                          persist({ lang: id });
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="mt-2 grid grid-cols-3 gap-2 rounded-xl bg-bg p-1">
                   {DIFFS.map((item) => (
                     <button
@@ -470,15 +546,15 @@ export function StarType() {
                 <ul className="mt-5 space-y-2 text-sm text-muted">
                   <li className="flex items-center gap-2">
                     <Keyboard className="size-4 shrink-0 text-primary" />
-                    直接按键盘字母，拼音模式不用声调
+                    {mode === "letter" ? "看准字母再按，按错会打断连击" : "直接按键盘字母，拼音模式不用声调"}
                   </li>
                   <li className="flex items-center gap-2">
                     <Crosshair className="size-4 shrink-0 text-primary" />
-                    退格删字，Esc 暂停。撞上座舰会掉船体
+                    {mode === "letter" ? "Esc 暂停。敌舰撞上座舰会掉船体" : "退格删字，Esc 暂停。撞上座舰会掉船体"}
                   </li>
                   <li className="flex items-center gap-2">
                     <Shield className="size-4 shrink-0 text-accent" />
-                    金色词会给护盾、缓速或清场
+                    {mode === "letter" ? "金色字母会给护盾、缓速或清场" : "金色词会给护盾、缓速或清场"}
                   </li>
                 </ul>
               </div>
@@ -561,6 +637,7 @@ export function StarType() {
         {showPad ? (
           <div ref={padRef} className="pointer-events-auto">
             <Keypad
+              letter={hud.mode === "letter"}
               onKey={(code) => {
                 audioRef.current?.unlock();
                 if (code === "backspace") game.backspace();

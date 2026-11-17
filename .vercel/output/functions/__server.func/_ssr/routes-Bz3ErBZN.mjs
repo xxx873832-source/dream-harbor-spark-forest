@@ -1,13 +1,185 @@
 import { i as __toESM } from "../_runtime.mjs";
 import { K as require_react, b as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
-import { a as Shield, c as Pause, l as Keyboard, n as Volume2, o as RotateCcw, r as Trophy, s as Play, t as VolumeX, u as Crosshair } from "../_libs/lucide-react.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-BsZYtDzS.js
+import { a as Shield, c as Pause, d as Crosshair, l as Music, n as Volume2, o as RotateCcw, r as Trophy, s as Play, t as VolumeX, u as Keyboard } from "../_libs/lucide-react.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-Bz3ErBZN.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
+var STEP = 60 / 98 / 4;
+var LOOP = 64;
+var BASS = [
+	110,
+	0,
+	110,
+	0,
+	110,
+	0,
+	82.41,
+	0,
+	110,
+	0,
+	110,
+	0,
+	82.41,
+	0,
+	110,
+	0,
+	87.31,
+	0,
+	87.31,
+	0,
+	130.81,
+	0,
+	87.31,
+	0,
+	87.31,
+	0,
+	98,
+	0,
+	110,
+	0,
+	87.31,
+	0,
+	130.81,
+	0,
+	130.81,
+	0,
+	164.81,
+	0,
+	130.81,
+	0,
+	98,
+	0,
+	98,
+	0,
+	130.81,
+	0,
+	98,
+	0,
+	98,
+	0,
+	98,
+	0,
+	146.83,
+	0,
+	98,
+	0,
+	110,
+	0,
+	98,
+	0,
+	82.41,
+	0,
+	98,
+	0
+];
+var LEAD = [
+	329.63,
+	0,
+	0,
+	0,
+	523.25,
+	0,
+	440,
+	0,
+	392,
+	0,
+	0,
+	0,
+	329.63,
+	0,
+	0,
+	0,
+	293.66,
+	0,
+	329.63,
+	0,
+	349.23,
+	0,
+	0,
+	0,
+	329.63,
+	0,
+	293.66,
+	0,
+	261.63,
+	0,
+	0,
+	0,
+	440,
+	0,
+	0,
+	0,
+	392,
+	0,
+	329.63,
+	0,
+	293.66,
+	0,
+	329.63,
+	0,
+	392,
+	0,
+	0,
+	0,
+	329.63,
+	0,
+	293.66,
+	0,
+	261.63,
+	0,
+	0,
+	0,
+	293.66,
+	0,
+	329.63,
+	0,
+	440,
+	0,
+	0,
+	0
+];
+var ARP = [
+	523.25,
+	659.25,
+	783.99,
+	659.25,
+	587.33,
+	523.25,
+	440,
+	392
+];
+var CHORDS = [
+	[
+		220,
+		261.63,
+		329.63
+	],
+	[
+		174.61,
+		220,
+		261.63
+	],
+	[
+		261.63,
+		329.63,
+		392
+	],
+	[
+		196,
+		246.94,
+		293.66
+	]
+];
 var AudioBus = class {
 	ctx = null;
 	master = null;
 	musicGain = null;
+	sfxGain = null;
+	noiseBuf = null;
+	timer = null;
+	nextNote = 0;
+	step = 0;
+	scene = "calm";
 	muted = false;
 	music = true;
 	failed = false;
@@ -17,31 +189,52 @@ var AudioBus = class {
 			if (!this.ctx) {
 				const ctx = new AudioContext();
 				const master = ctx.createGain();
-				master.gain.value = this.muted ? 0 : .42;
+				master.gain.value = this.muted ? 0 : .5;
 				master.connect(ctx.destination);
 				const musicGain = ctx.createGain();
-				musicGain.gain.value = this.music ? .16 : 0;
+				musicGain.gain.value = 0;
 				musicGain.connect(master);
+				const sfxGain = ctx.createGain();
+				sfxGain.gain.value = .9;
+				sfxGain.connect(master);
 				this.ctx = ctx;
 				this.master = master;
 				this.musicGain = musicGain;
-				this.startPad(ctx, musicGain);
+				this.sfxGain = sfxGain;
+				this.applyLevel();
+				this.arm();
 			}
 			if (this.ctx.state === "suspended") this.ctx.resume();
+			if (this.nextNote < this.ctx.currentTime) this.nextNote = this.ctx.currentTime + .06;
 		} catch {
 			this.failed = true;
 		}
 	}
 	setMuted(muted) {
 		this.muted = muted;
-		if (this.master) this.master.gain.value = muted ? 0 : .42;
+		this.ramp(this.master, muted ? 0 : .5);
 	}
 	setMusic(on) {
 		this.music = on;
-		if (this.musicGain) this.musicGain.gain.value = on ? .16 : 0;
+		this.applyLevel();
+	}
+	setScene(scene) {
+		if (this.scene === scene) return;
+		this.scene = scene;
+		this.applyLevel();
+	}
+	status() {
+		return {
+			music: this.music,
+			muted: this.muted,
+			scene: this.scene,
+			state: this.ctx?.state ?? "off"
+		};
 	}
 	resume() {
-		if (this.ctx?.state === "suspended") this.ctx.resume();
+		if (!this.ctx) return;
+		if (this.ctx.state === "suspended") this.ctx.resume();
+		if (this.nextNote < this.ctx.currentTime) this.nextNote = this.ctx.currentTime + .06;
 	}
 	handle(events) {
 		if (!this.ctx || this.muted) return;
@@ -70,26 +263,115 @@ var AudioBus = class {
 		], .16);
 		else if (event.type === "over") this.sweep(320, 60, .4, .06);
 	}
-	startPad(ctx, dest) {
-		for (const freq of [
-			98,
-			146.8,
-			196
-		]) {
-			const osc = ctx.createOscillator();
-			osc.type = "sine";
-			osc.frequency.value = freq;
-			const gain = ctx.createGain();
-			gain.gain.value = .05;
-			osc.connect(gain);
-			gain.connect(dest);
-			osc.start();
+	applyLevel() {
+		const level = !this.music ? 0 : this.scene === "boss" ? .78 : this.scene === "play" ? .62 : .4;
+		this.ramp(this.musicGain, level);
+	}
+	ramp(node, value) {
+		if (!node || !this.ctx) return;
+		node.gain.setTargetAtTime(Math.max(1e-4, value), this.ctx.currentTime, .08);
+		if (value === 0) node.gain.setTargetAtTime(0, this.ctx.currentTime + .2, .05);
+	}
+	arm() {
+		if (this.timer || !this.ctx) return;
+		this.nextNote = this.ctx.currentTime + .08;
+		this.timer = setInterval(() => this.schedule(), 25);
+	}
+	schedule() {
+		const ctx = this.ctx;
+		if (!ctx || ctx.state !== "running") return;
+		if (this.nextNote < ctx.currentTime - .2) this.nextNote = ctx.currentTime + .05;
+		const horizon = ctx.currentTime + .16;
+		while (this.nextNote < horizon) {
+			if (this.music && !this.muted) this.playStep(this.step, this.nextNote);
+			this.nextNote += STEP;
+			this.step = (this.step + 1) % LOOP;
 		}
+	}
+	playStep(step, time) {
+		const calm = this.scene === "calm";
+		const bass = BASS[step] ?? 0;
+		if (bass) {
+			this.musicTone(time, bass, STEP * 1.7, "sawtooth", calm ? .06 : .09, 460);
+			this.musicTone(time, bass / 2, STEP * 1.7, "sine", .07, 180);
+		}
+		if (step % 16 === 0) {
+			const chord = CHORDS[step / 16 % CHORDS.length] ?? CHORDS[0];
+			for (const freq of chord) this.musicTone(time, freq, STEP * 14.5, "sine", calm ? .028 : .02, 880);
+		}
+		const arp = ARP[(step >> 1) % ARP.length] ?? 440;
+		if (step % 2 === 1) this.musicTone(time, arp, STEP * 1.3, "sine", calm ? .03 : .022, 1500);
+		if (calm) return;
+		const lead = LEAD[step] ?? 0;
+		if (lead) this.musicTone(time, lead, STEP * 1.55, "triangle", this.scene === "boss" ? .07 : .048, 1900);
+		if (step % 16 === 0 || step % 16 === 8) this.kick(time);
+		if (step % 2 === 1) this.hat(time, this.scene === "boss" ? .045 : .028);
+		if (this.scene === "boss" && step % 8 === 4) this.musicTone(time, 880, .07, "square", .028, 2400);
+	}
+	musicTone(time, freq, dur, type, vol, cutoff) {
+		const ctx = this.ctx;
+		const dest = this.musicGain;
+		if (!ctx || !dest || freq <= 0) return;
+		const osc = ctx.createOscillator();
+		const filter = ctx.createBiquadFilter();
+		const gain = ctx.createGain();
+		osc.type = type;
+		osc.frequency.setValueAtTime(freq, time);
+		filter.type = "lowpass";
+		filter.frequency.setValueAtTime(cutoff, time);
+		gain.gain.setValueAtTime(1e-4, time);
+		gain.gain.exponentialRampToValueAtTime(vol, time + .018);
+		gain.gain.exponentialRampToValueAtTime(1e-4, time + Math.max(.05, dur));
+		osc.connect(filter);
+		filter.connect(gain);
+		gain.connect(dest);
+		osc.start(time);
+		osc.stop(time + dur + .03);
+	}
+	kick(time) {
+		const ctx = this.ctx;
+		const dest = this.musicGain;
+		if (!ctx || !dest) return;
+		const osc = ctx.createOscillator();
+		const gain = ctx.createGain();
+		osc.type = "sine";
+		osc.frequency.setValueAtTime(150, time);
+		osc.frequency.exponentialRampToValueAtTime(46, time + .12);
+		gain.gain.setValueAtTime(.2, time);
+		gain.gain.exponentialRampToValueAtTime(1e-4, time + .16);
+		osc.connect(gain);
+		gain.connect(dest);
+		osc.start(time);
+		osc.stop(time + .18);
+	}
+	hat(time, vol) {
+		const ctx = this.ctx;
+		const dest = this.musicGain;
+		if (!ctx || !dest) return;
+		if (!this.noiseBuf) {
+			const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * .2), ctx.sampleRate);
+			const data = buf.getChannelData(0);
+			for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+			this.noiseBuf = buf;
+		}
+		const src = ctx.createBufferSource();
+		src.buffer = this.noiseBuf;
+		const filter = ctx.createBiquadFilter();
+		filter.type = "highpass";
+		filter.frequency.value = 7e3;
+		const gain = ctx.createGain();
+		gain.gain.setValueAtTime(vol, time);
+		gain.gain.exponentialRampToValueAtTime(1e-4, time + .04);
+		src.connect(filter);
+		filter.connect(gain);
+		gain.connect(dest);
+		src.start(time);
+		src.stop(time + .05);
 	}
 	blip(freq, dur, type, vol) {
 		const ctx = this.ctx;
-		const master = this.master;
-		if (!ctx || !master) return;
+		const dest = this.sfxGain;
+		if (!ctx || !dest) return;
 		const osc = ctx.createOscillator();
 		const gain = ctx.createGain();
 		osc.type = type;
@@ -97,14 +379,14 @@ var AudioBus = class {
 		gain.gain.setValueAtTime(vol, ctx.currentTime);
 		gain.gain.exponentialRampToValueAtTime(1e-4, ctx.currentTime + dur);
 		osc.connect(gain);
-		gain.connect(master);
+		gain.connect(dest);
 		osc.start();
 		osc.stop(ctx.currentTime + dur + .02);
 	}
 	sweep(from, to, dur, vol) {
 		const ctx = this.ctx;
-		const master = this.master;
-		if (!ctx || !master) return;
+		const dest = this.sfxGain;
+		if (!ctx || !dest) return;
 		const osc = ctx.createOscillator();
 		const gain = ctx.createGain();
 		osc.type = "sawtooth";
@@ -113,7 +395,7 @@ var AudioBus = class {
 		gain.gain.setValueAtTime(vol, ctx.currentTime);
 		gain.gain.exponentialRampToValueAtTime(1e-4, ctx.currentTime + dur);
 		osc.connect(gain);
-		gain.connect(master);
+		gain.connect(dest);
 		osc.start();
 		osc.stop(ctx.currentTime + dur + .02);
 	}
@@ -122,8 +404,8 @@ var AudioBus = class {
 	}
 	noise(dur, vol) {
 		const ctx = this.ctx;
-		const master = this.master;
-		if (!ctx || !master) return;
+		const dest = this.sfxGain;
+		if (!ctx || !dest) return;
 		const n = Math.max(1, Math.floor(ctx.sampleRate * dur));
 		const buffer = ctx.createBuffer(1, n, ctx.sampleRate);
 		const data = buffer.getChannelData(0);
@@ -137,7 +419,7 @@ var AudioBus = class {
 		gain.gain.value = vol;
 		src.connect(filter);
 		filter.connect(gain);
-		gain.connect(master);
+		gain.connect(dest);
 		src.start();
 	}
 };
@@ -460,7 +742,8 @@ function drawShip(ctx, img, kind, x, y, cw, ch, rot) {
 }
 function drawLabel(ctx, enemy, x, y, spriteH, cw, ch, progress, focused, error) {
 	const letters = (enemy.hanzi ? enemy.word : enemy.word.toUpperCase()).split("");
-	let gap = Math.min(26, Math.max(15, cw * .02));
+	const single = letters.length === 1;
+	let gap = single ? 42 : Math.min(26, Math.max(15, cw * .02));
 	let total = letters.length * gap;
 	const maxTotal = cw * .86;
 	if (total > maxTotal) {
@@ -469,10 +752,11 @@ function drawLabel(ctx, enemy, x, y, spriteH, cw, ch, progress, focused, error) 
 	}
 	const hanzi = enemy.hanzi;
 	const hint = enemy.power ? POWER_HINT[enemy.power] : "";
-	const size = Math.max(13, gap * .92);
+	const size = single ? Math.max(28, cw * .045) : Math.max(13, gap * .92);
 	const hanziSize = Math.max(15, size * 1.05);
 	const hintSize = 11;
-	const plateH = size + 16 + (hanzi ? hanziSize + 4 : 0) + (hint ? 15 : 0);
+	const pips = enemy.maxHp > 1;
+	const plateH = size + 16 + (hanzi ? hanziSize + 4 : 0) + (hint ? 15 : 0) + (pips ? 12 : 0);
 	const plateW = Math.max(total + 22, hanzi ? hanzi.length * hanziSize + 22 : 0, hint.length * hintSize + 18);
 	let left = x - plateW / 2;
 	left = Math.max(8, Math.min(cw - plateW - 8, left));
@@ -507,6 +791,17 @@ function drawLabel(ctx, enemy, x, y, spriteH, cw, ch, progress, focused, error) 
 		ctx.font = `600 ${hintSize}px ${FONT}`;
 		ctx.fillStyle = "#ffb347";
 		ctx.fillText(hint, left + plateW / 2, cursor + size + 3);
+	}
+	if (pips) {
+		const pipY = top + plateH - 10;
+		const pipGap = 10;
+		const pipStart = left + plateW / 2 - (enemy.maxHp - 1) * pipGap / 2;
+		for (let i = 0; i < enemy.maxHp; i++) {
+			ctx.beginPath();
+			ctx.arc(pipStart + i * pipGap, pipY, 3, 0, Math.PI * 2);
+			ctx.fillStyle = i < enemy.hp ? "#ffb347" : "rgba(231,243,255,0.25)";
+			ctx.fill();
+		}
 	}
 	ctx.restore();
 	return {
@@ -670,6 +965,7 @@ var Game = class {
 	sub = "intro";
 	lang = "en";
 	diff = "normal";
+	mode = "word";
 	score = 0;
 	combo = 0;
 	maxCombo = 0;
@@ -716,6 +1012,7 @@ var Game = class {
 	configure(opts) {
 		this.lang = opts.lang;
 		this.diff = opts.diff;
+		this.mode = opts.mode;
 		this.best = opts.best;
 		this.prevBest = opts.best;
 	}
@@ -784,7 +1081,8 @@ var Game = class {
 			best: Math.max(this.best, this.prevBest),
 			isRecord: this.isRecord,
 			lang: this.lang,
-			diff: this.diff
+			diff: this.diff,
+			mode: this.mode
 		};
 	}
 	snapshot() {
@@ -812,6 +1110,10 @@ var Game = class {
 	type(ch) {
 		if (this.phase !== "play" || this.sub !== "combat") return;
 		if (!/^[a-z]$/.test(ch)) return;
+		if (this.mode === "letter") {
+			this.typeLetter(ch);
+			return;
+		}
 		const next = this.buffer + ch;
 		const aliveWords = this.enemies;
 		const exact = aliveWords.filter((e) => e.word === next);
@@ -832,8 +1134,41 @@ var Game = class {
 			this.events.push({ type: "tick" });
 			return;
 		}
+		this.miss(this.buffer.length > 0);
+	}
+	backspace() {
+		if (this.phase !== "play" || this.sub !== "combat" || this.mode === "letter") return;
+		this.buffer = this.buffer.slice(0, -1);
+	}
+	typeLetter(ch) {
+		const hits = this.enemies.filter((enemy) => enemy.word === ch);
+		if (!hits.length) {
+			this.miss(true);
+			return;
+		}
+		this.correct += 1;
+		const target = this.closest(hits);
+		target.hp -= 1;
+		this.muzzle = .07;
+		this.events.push({ type: "tick" });
+		if (target.hp > 0) {
+			this.fire(target);
+			this.burst(target.x, target.y, 8, "#ffb347");
+			this.shake = Math.min(1, this.shake + .12);
+			this.floaters.push({
+				x: target.x,
+				y: target.y - .04,
+				text: `${target.hp}`,
+				life: .45,
+				max: .45,
+				color: "#ffb347"
+			});
+			return;
+		}
+		this.destroy(target);
+	}
+	miss(hard) {
 		this.wrong += 1;
-		const hard = this.buffer.length > 0;
 		if (hard) {
 			const prev = this.combo;
 			this.combo = 0;
@@ -852,10 +1187,6 @@ var Game = class {
 			type: "wrong",
 			hard
 		});
-	}
-	backspace() {
-		if (this.phase !== "play" || this.sub !== "combat") return;
-		this.buffer = this.buffer.slice(0, -1);
 	}
 	focus() {
 		const list = this.matches();
@@ -947,20 +1278,26 @@ var Game = class {
 		this.spawned = 0;
 		this.bossSpawned = false;
 		this.buffer = "";
-		this.quota = this.wave % 5 === 0 ? 3 + Math.floor(this.wave / 5) : 3 + this.wave;
+		this.quota = this.mode === "letter" ? this.wave % 5 === 0 ? 6 + Math.floor(this.wave / 5) : 8 + this.wave : this.wave % 5 === 0 ? 3 + Math.floor(this.wave / 5) : 3 + this.wave;
 		this.spawnTimer = .28;
 	}
 	maxAlive() {
+		if (this.mode === "letter") {
+			const base = this.diff === "easy" ? 4 : this.diff === "normal" ? 5 : 7;
+			return Math.min(8, base + Math.floor((this.wave - 1) / 3));
+		}
 		const base = this.diff === "easy" ? 2 : this.diff === "normal" ? 3 : 4;
 		return Math.min(7, base + Math.floor((this.wave - 1) / 2));
 	}
 	interval() {
 		const m = this.diff === "easy" ? 1.18 : this.diff === "normal" ? 1 : .84;
+		if (this.mode === "letter") return Math.max(.48, (1.25 - this.wave * .045) * m);
 		return Math.max(.7, (2.2 - this.wave * .07) * m);
 	}
 	speedFor(kind) {
 		const diffMul = this.diff === "easy" ? .78 : this.diff === "normal" ? 1 : 1.18;
 		let speed = (.04 + (this.wave - 1) * .0042) * diffMul;
+		if (this.mode === "letter") speed *= 1.15;
 		if (kind === "scout") speed *= 1.08;
 		if (kind === "raider") speed *= .94;
 		if (kind === "brute") speed *= .8;
@@ -979,29 +1316,48 @@ var Game = class {
 	}
 	spawn() {
 		const kind = this.nextKind();
-		let [minL, maxL] = lenRange(this.diff, this.wave, kind === "boss");
-		if (kind === "brute") {
-			minL += 1;
-			maxL += 1;
-		}
-		if (kind === "scout") maxL = Math.max(minL, maxL - 1);
 		const alive = this.enemies.map((e) => e.word);
-		let entry = pickEntry(this.lang, minL, maxL, alive, kind === "boss");
+		let entry;
 		let power = null;
-		const powerFree = !this.enemies.some((e) => e.power);
-		if (kind !== "boss" && this.wave >= 2 && powerFree && Math.random() < .16) {
-			const options = [
-				"shield",
-				"slow",
-				"nova"
-			];
-			const choice = options[Math.floor(Math.random() * options.length)];
-			const word = POWER_WORDS[this.lang][choice];
-			if (!conflicts(word.word, alive)) {
-				entry = word;
-				power = choice;
+		if (this.mode === "letter") {
+			entry = {
+				word: this.pickLetter(alive),
+				display: "",
+				hanzi: null
+			};
+			const powerFree = !this.enemies.some((e) => e.power);
+			if (kind !== "boss" && this.wave >= 2 && powerFree && Math.random() < .14) {
+				const options = [
+					"shield",
+					"slow",
+					"nova"
+				];
+				power = options[Math.floor(Math.random() * options.length)];
+			}
+		} else {
+			let [minL, maxL] = lenRange(this.diff, this.wave, kind === "boss");
+			if (kind === "brute") {
+				minL += 1;
+				maxL += 1;
+			}
+			if (kind === "scout") maxL = Math.max(minL, maxL - 1);
+			entry = pickEntry(this.lang, minL, maxL, alive, kind === "boss");
+			const powerFree = !this.enemies.some((e) => e.power);
+			if (kind !== "boss" && this.wave >= 2 && powerFree && Math.random() < .16) {
+				const options = [
+					"shield",
+					"slow",
+					"nova"
+				];
+				const choice = options[Math.floor(Math.random() * options.length)];
+				const word = POWER_WORDS[this.lang][choice];
+				if (!conflicts(word.word, alive)) {
+					entry = word;
+					power = choice;
+				}
 			}
 		}
+		const hp = this.mode === "letter" && kind === "boss" ? Math.min(5, 2 + Math.floor(this.wave / 5)) : 1;
 		let x = .2 + Math.random() * .6;
 		for (let n = 0; n < 8; n++) {
 			const tryX = .14 + Math.random() * .72;
@@ -1019,9 +1375,17 @@ var Game = class {
 			wobble: Math.random() * Math.PI * 2,
 			word: entry.word,
 			hanzi: entry.hanzi,
-			power
+			power,
+			hp,
+			maxHp: hp
 		});
 		this.spawned += 1;
+	}
+	pickLetter(alive) {
+		const used = new Set(alive);
+		const free = "abcdefghijklmnopqrstuvwxyz".split("").filter((ch) => !used.has(ch));
+		const pool = free.length ? free : "abcdefghijklmnopqrstuvwxyz".split("");
+		return pool[Math.floor(Math.random() * pool.length)];
 	}
 	separate() {
 		const list = this.enemies;
@@ -1052,7 +1416,8 @@ var Game = class {
 		this.maxCombo = Math.max(this.maxCombo, this.combo);
 		const mult = 1 + (this.combo - 1) * .14;
 		const diffM = this.diff === "easy" ? .85 : this.diff === "normal" ? 1 : 1.35;
-		let pts = Math.round(enemy.word.length * 22 * mult * diffM);
+		const base = this.mode === "letter" ? 42 : enemy.word.length * 22;
+		let pts = Math.round(base * mult * diffM);
 		if (enemy.kind === "boss") pts = Math.round(pts * 2.6);
 		if (enemy.power) pts = Math.round(pts * 1.2);
 		this.score += pts;
@@ -1203,6 +1568,9 @@ var DIFFS = [
 		label: "专家"
 	}
 ];
+function bestKey(mode, lang, diff) {
+	return mode === "letter" ? `letter:${diff}` : `${lang}:${diff}`;
+}
 function loadSave() {
 	try {
 		const raw = localStorage.getItem(SAVE_KEY);
@@ -1213,7 +1581,9 @@ function loadSave() {
 			best: data.best,
 			lang: data.lang === "py" ? "py" : "en",
 			diff: data.diff === "easy" || data.diff === "expert" ? data.diff : "normal",
-			muted: Boolean(data.muted)
+			mode: data.mode === "letter" ? "letter" : "word",
+			muted: Boolean(data.muted),
+			music: data.music !== false
 		};
 	} catch {
 		return null;
@@ -1228,7 +1598,7 @@ function WordLine({ word, count }) {
 		}, `${ch}-${i}`))
 	});
 }
-function Keypad({ onKey }) {
+function Keypad({ onKey, letter }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		className: "pointer-events-auto border-t border-border bg-bg/90 px-2 pt-2 pb-3 backdrop-blur-md",
 		children: [
@@ -1245,7 +1615,7 @@ function Keypad({ onKey }) {
 					onKey(ch);
 				},
 				children: ch
-			}, ch)), row.startsWith("z") ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			}, ch)), row.startsWith("z") && !letter ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 				type: "button",
 				className: "h-11 min-w-12 flex-1 rounded-md border border-border bg-surface px-2 text-sm text-muted",
 				onPointerDown: (event) => {
@@ -1268,23 +1638,31 @@ function StarType() {
 	const [hud, setHud] = (0, import_react.useState)(() => game.hud());
 	const [lang, setLang] = (0, import_react.useState)("en");
 	const [diff, setDiff] = (0, import_react.useState)("normal");
+	const [mode, setMode] = (0, import_react.useState)("word");
 	const [bestMap, setBestMap] = (0, import_react.useState)({});
 	const [muted, setMuted] = (0, import_react.useState)(false);
+	const [musicOn, setMusicOn] = (0, import_react.useState)(true);
 	const [touch, setTouch] = (0, import_react.useState)(false);
 	const langRef = (0, import_react.useRef)(lang);
 	const diffRef = (0, import_react.useRef)(diff);
+	const modeRef = (0, import_react.useRef)(mode);
 	const bestRef = (0, import_react.useRef)(bestMap);
 	const mutedRef = (0, import_react.useRef)(muted);
+	const musicRef = (0, import_react.useRef)(musicOn);
 	langRef.current = lang;
 	diffRef.current = diff;
+	modeRef.current = mode;
 	bestRef.current = bestMap;
 	mutedRef.current = muted;
+	musicRef.current = musicOn;
 	function persist(next) {
 		const save = {
 			best: next?.best ?? bestRef.current,
 			lang: next?.lang ?? langRef.current,
 			diff: next?.diff ?? diffRef.current,
-			muted: next?.muted ?? mutedRef.current
+			mode: next?.mode ?? modeRef.current,
+			muted: next?.muted ?? mutedRef.current,
+			music: next?.music ?? musicRef.current
 		};
 		localStorage.setItem(SAVE_KEY, JSON.stringify(save));
 	}
@@ -1294,7 +1672,7 @@ function StarType() {
 		audio?.handle(events);
 		const next = game.hud();
 		if (events.some((event) => event.type === "over")) {
-			const key = `${game.lang}:${game.diff}`;
+			const key = bestKey(game.mode, game.lang, game.diff);
 			const merged = {
 				...bestRef.current,
 				[key]: Math.max(bestRef.current[key] ?? 0, game.score)
@@ -1307,10 +1685,11 @@ function StarType() {
 	}
 	function begin() {
 		audioRef.current?.unlock();
-		const key = `${langRef.current}:${diffRef.current}`;
+		const key = bestKey(modeRef.current, langRef.current, diffRef.current);
 		game.configure({
 			lang: langRef.current,
 			diff: diffRef.current,
+			mode: modeRef.current,
 			best: bestRef.current[key] ?? 0
 		});
 		game.start();
@@ -1321,9 +1700,12 @@ function StarType() {
 		if (saved) {
 			setLang(saved.lang);
 			setDiff(saved.diff);
+			setMode(saved.mode);
 			setBestMap(saved.best);
 			setMuted(saved.muted);
+			setMusicOn(saved.music);
 			audioRef.current?.setMuted(saved.muted);
+			audioRef.current?.setMusic(saved.music);
 			bestRef.current = saved.best;
 		}
 		const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -1368,12 +1750,14 @@ function StarType() {
 					const dt = Math.min(.05, (now - last) / 1e3);
 					last = now;
 					game.update(dt);
+					const scene = game.phase === "play" && game.wave % 5 === 0 ? "boss" : game.phase === "play" ? "play" : "calm";
+					audioRef.current?.setScene(scene);
 					render(ctx, cssW, cssH, game, art, reduce.matches);
 					const events = game.pullEvents();
 					if (events.length) {
 						audioRef.current?.handle(events);
 						if (events.some((event) => event.type === "over")) {
-							const key = `${game.lang}:${game.diff}`;
+							const key = bestKey(game.mode, game.lang, game.diff);
 							const merged = {
 								...bestRef.current,
 								[key]: Math.max(bestRef.current[key] ?? 0, game.score)
@@ -1443,7 +1827,8 @@ function StarType() {
 				game.backspace();
 				flush();
 			},
-			snapshot: () => game.snapshot()
+			snapshot: () => game.snapshot(),
+			audio: () => audioRef.current?.status() ?? null
 		};
 		return () => {
 			cancelAnimationFrame(frame);
@@ -1453,8 +1838,16 @@ function StarType() {
 			document.removeEventListener("visibilitychange", onVis);
 		};
 	}, [game]);
-	const best = bestMap[`${lang}:${diff}`] ?? 0;
+	const best = bestMap[bestKey(mode, lang, diff)] ?? 0;
 	const showPad = touch && (hud.phase === "play" || hud.phase === "pause");
+	function toggleMusic() {
+		const next = !musicRef.current;
+		musicRef.current = next;
+		setMusicOn(next);
+		audioRef.current?.unlock();
+		audioRef.current?.setMusic(next);
+		persist({ music: next });
+	}
 	function toggleMute() {
 		const next = !mutedRef.current;
 		mutedRef.current = next;
@@ -1525,7 +1918,7 @@ function StarType() {
 										}) : null
 									] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 										className: "pt-2 text-sm text-muted",
-										children: "输入字母，锁定敌舰"
+										children: hud.mode === "letter" ? hud.bossWave ? "连打旗舰上的同一个字母" : "按下舰上的字母" : "输入字母，锁定敌舰"
 									}),
 									hud.slow ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 										className: "text-xs text-primary",
@@ -1540,23 +1933,34 @@ function StarType() {
 								className: "flex flex-col items-end gap-2",
 								children: [
 									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-										className: "pointer-events-auto flex gap-2",
-										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-											type: "button",
-											className: "grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/80 text-fg",
-											onClick: toggleMute,
-											"aria-label": muted ? "打开声音" : "关闭声音",
-											children: muted ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeX, { className: "size-5" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Volume2, { className: "size-5" })
-										}), hud.phase === "play" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-											type: "button",
-											className: "grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/80 text-fg",
-											onClick: () => {
-												game.pause();
-												flush();
-											},
-											"aria-label": "暂停",
-											children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pause, { className: "size-5" })
-										}) : null]
+										className: "pointer-events-auto flex gap-1",
+										children: [
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+												type: "button",
+												className: musicOn ? "grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/80 text-primary" : "grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/80 text-muted",
+												onClick: toggleMusic,
+												"aria-label": musicOn ? "关闭背景音乐" : "打开背景音乐",
+												"aria-pressed": musicOn,
+												children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Music, { className: "size-5" })
+											}),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+												type: "button",
+												className: "grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/80 text-fg",
+												onClick: toggleMute,
+												"aria-label": muted ? "打开声音" : "关闭声音",
+												children: muted ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeX, { className: "size-5" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Volume2, { className: "size-5" })
+											}),
+											hud.phase === "play" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+												type: "button",
+												className: "grid h-11 w-11 place-items-center rounded-full border border-border bg-surface/80 text-fg",
+												onClick: () => {
+													game.pause();
+													flush();
+												},
+												"aria-label": "暂停",
+												children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pause, { className: "size-5" })
+											}) : null
+										]
 									}),
 									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 										className: "flex gap-1",
@@ -1607,7 +2011,7 @@ function StarType() {
 						hud.phase === "menu" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 							className: "absolute inset-0 flex items-center justify-center p-4",
 							children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								className: "pointer-events-auto w-full max-w-md rounded-2xl border border-border bg-surface/90 p-6 shadow-2xl backdrop-blur-md",
+								className: "pointer-events-auto max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-surface/90 p-6 shadow-2xl backdrop-blur-md",
 								children: [
 									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 										className: "text-xs tracking-widest text-primary",
@@ -1619,10 +2023,23 @@ function StarType() {
 									}),
 									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 										className: "mt-3 text-sm leading-6 text-muted",
-										children: "敌舰顶着单词俯冲。敲对字母锁定，打完整个词就把它打下来。"
+										children: mode === "letter" ? "每艘敌舰只有一个字母。按中就击落，同屏不会重复。旗舰要连打同一个字母。" : "敌舰顶着单词俯冲。敲对字母锁定，打完整个词就把它打下来。"
 									}),
 									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 										className: "mt-5 grid grid-cols-2 gap-2 rounded-xl bg-bg p-1",
+										children: [["word", "单词"], ["letter", "单字母"]].map(([id, label]) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+											type: "button",
+											className: mode === id ? "h-11 rounded-lg bg-primary font-medium text-on-primary" : "h-11 rounded-lg text-muted",
+											onClick: () => {
+												setMode(id);
+												modeRef.current = id;
+												persist({ mode: id });
+											},
+											children: label
+										}, id))
+									}),
+									mode === "word" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+										className: "mt-2 grid grid-cols-2 gap-2 rounded-xl bg-bg p-1",
 										children: [["en", "英语"], ["py", "拼音"]].map(([id, label]) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 											type: "button",
 											className: lang === id ? "h-11 rounded-lg bg-primary font-medium text-on-primary" : "h-11 rounded-lg text-muted",
@@ -1633,7 +2050,7 @@ function StarType() {
 											},
 											children: label
 										}, id))
-									}),
+									}) : null,
 									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 										className: "mt-2 grid grid-cols-3 gap-2 rounded-xl bg-bg p-1",
 										children: DIFFS.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
@@ -1662,15 +2079,15 @@ function StarType() {
 										children: [
 											/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
 												className: "flex items-center gap-2",
-												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Keyboard, { className: "size-4 shrink-0 text-primary" }), "直接按键盘字母，拼音模式不用声调"]
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Keyboard, { className: "size-4 shrink-0 text-primary" }), mode === "letter" ? "看准字母再按，按错会打断连击" : "直接按键盘字母，拼音模式不用声调"]
 											}),
 											/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
 												className: "flex items-center gap-2",
-												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Crosshair, { className: "size-4 shrink-0 text-primary" }), "退格删字，Esc 暂停。撞上座舰会掉船体"]
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Crosshair, { className: "size-4 shrink-0 text-primary" }), mode === "letter" ? "Esc 暂停。敌舰撞上座舰会掉船体" : "退格删字，Esc 暂停。撞上座舰会掉船体"]
 											}),
 											/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
 												className: "flex items-center gap-2",
-												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Shield, { className: "size-4 shrink-0 text-accent" }), "金色词会给护盾、缓速或清场"]
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Shield, { className: "size-4 shrink-0 text-accent" }), mode === "letter" ? "金色字母会给护盾、缓速或清场" : "金色词会给护盾、缓速或清场"]
 											})
 										]
 									})
@@ -1803,12 +2220,15 @@ function StarType() {
 				showPad ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 					ref: padRef,
 					className: "pointer-events-auto",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Keypad, { onKey: (code) => {
-						audioRef.current?.unlock();
-						if (code === "backspace") game.backspace();
-						else game.type(code);
-						flush();
-					} })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Keypad, {
+						letter: hud.mode === "letter",
+						onKey: (code) => {
+							audioRef.current?.unlock();
+							if (code === "backspace") game.backspace();
+							else game.type(code);
+							flush();
+						}
+					})
 				}) : null
 			]
 		})]

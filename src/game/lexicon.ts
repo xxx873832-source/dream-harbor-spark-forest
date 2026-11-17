@@ -1,5 +1,6 @@
 export type Lang = "en" | "py";
 export type Diff = "easy" | "normal" | "expert";
+export type Mode = "word" | "letter";
 export type Power = "shield" | "slow" | "nova";
 
 export type Entry = { word: string; display: string; hanzi: string | null };

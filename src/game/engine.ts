@@ -5,6 +5,7 @@ import {
   type Diff,
   type Entry,
   type Lang,
+  type Mode,
   type Power,
 } from "./lexicon";
 
@@ -31,6 +32,8 @@ export type Enemy = {
   word: string;
   hanzi: string | null;
   power: Power | null;
+  hp: number;
+  maxHp: number;
 };
 
 type Particle = {
@@ -69,6 +72,7 @@ export type Hud = {
   isRecord: boolean;
   lang: Lang;
   diff: Diff;
+  mode: Mode;
 };
 
 const MAX_HULL = 5;
@@ -93,6 +97,7 @@ export class Game {
   sub: Sub = "intro";
   lang: Lang = "en";
   diff: Diff = "normal";
+  mode: Mode = "word";
   score = 0;
   combo = 0;
   maxCombo = 0;
@@ -138,9 +143,10 @@ export class Game {
     }));
   }
 
-  configure(opts: { lang: Lang; diff: Diff; best: number }) {
+  configure(opts: { lang: Lang; diff: Diff; mode: Mode; best: number }) {
     this.lang = opts.lang;
     this.diff = opts.diff;
+    this.mode = opts.mode;
     this.best = opts.best;
     this.prevBest = opts.best;
   }
@@ -217,6 +223,7 @@ export class Game {
       isRecord: this.isRecord,
       lang: this.lang,
       diff: this.diff,
+      mode: this.mode,
     };
   }
 
@@ -242,6 +249,10 @@ export class Game {
   type(ch: string) {
     if (this.phase !== "play" || this.sub !== "combat") return;
     if (!/^[a-z]$/.test(ch)) return;
+    if (this.mode === "letter") {
+      this.typeLetter(ch);
+      return;
+    }
     const next = this.buffer + ch;
     const aliveWords = this.enemies;
     const exact = aliveWords.filter((e) => e.word === next);
@@ -262,8 +273,44 @@ export class Game {
       this.events.push({ type: "tick" });
       return;
     }
+    this.miss(this.buffer.length > 0);
+  }
+
+  backspace() {
+    if (this.phase !== "play" || this.sub !== "combat" || this.mode === "letter") return;
+    this.buffer = this.buffer.slice(0, -1);
+  }
+
+  private typeLetter(ch: string) {
+    const hits = this.enemies.filter((enemy) => enemy.word === ch);
+    if (!hits.length) {
+      this.miss(true);
+      return;
+    }
+    this.correct += 1;
+    const target = this.closest(hits);
+    target.hp -= 1;
+    this.muzzle = 0.07;
+    this.events.push({ type: "tick" });
+    if (target.hp > 0) {
+      this.fire(target);
+      this.burst(target.x, target.y, 8, "#ffb347");
+      this.shake = Math.min(1, this.shake + 0.12);
+      this.floaters.push({
+        x: target.x,
+        y: target.y - 0.04,
+        text: `${target.hp}`,
+        life: 0.45,
+        max: 0.45,
+        color: "#ffb347",
+      });
+      return;
+    }
+    this.destroy(target);
+  }
+
+  private miss(hard: boolean) {
     this.wrong += 1;
-    const hard = this.buffer.length > 0;
     if (hard) {
       const prev = this.combo;
       this.combo = 0;
@@ -281,11 +328,6 @@ export class Game {
       }
     }
     this.events.push({ type: "wrong", hard });
-  }
-
-  backspace() {
-    if (this.phase !== "play" || this.sub !== "combat") return;
-    this.buffer = this.buffer.slice(0, -1);
   }
 
   focus(): Enemy | null {
@@ -390,23 +432,36 @@ export class Game {
     this.spawned = 0;
     this.bossSpawned = false;
     this.buffer = "";
-    this.quota = this.wave % 5 === 0 ? 3 + Math.floor(this.wave / 5) : 3 + this.wave;
+    this.quota =
+      this.mode === "letter"
+        ? this.wave % 5 === 0
+          ? 6 + Math.floor(this.wave / 5)
+          : 8 + this.wave
+        : this.wave % 5 === 0
+          ? 3 + Math.floor(this.wave / 5)
+          : 3 + this.wave;
     this.spawnTimer = 0.28;
   }
 
   private maxAlive() {
+    if (this.mode === "letter") {
+      const base = this.diff === "easy" ? 4 : this.diff === "normal" ? 5 : 7;
+      return Math.min(8, base + Math.floor((this.wave - 1) / 3));
+    }
     const base = this.diff === "easy" ? 2 : this.diff === "normal" ? 3 : 4;
     return Math.min(7, base + Math.floor((this.wave - 1) / 2));
   }
 
   private interval() {
     const m = this.diff === "easy" ? 1.18 : this.diff === "normal" ? 1 : 0.84;
+    if (this.mode === "letter") return Math.max(0.48, (1.25 - this.wave * 0.045) * m);
     return Math.max(0.7, (2.2 - this.wave * 0.07) * m);
   }
 
   private speedFor(kind: Kind) {
     const diffMul = this.diff === "easy" ? 0.78 : this.diff === "normal" ? 1 : 1.18;
     let speed = (0.04 + (this.wave - 1) * 0.0042) * diffMul;
+    if (this.mode === "letter") speed *= 1.15;
     if (kind === "scout") speed *= 1.08;
     if (kind === "raider") speed *= 0.94;
     if (kind === "brute") speed *= 0.8;
@@ -428,25 +483,36 @@ export class Game {
 
   private spawn() {
     const kind = this.nextKind();
-    let [minL, maxL] = lenRange(this.diff, this.wave, kind === "boss");
-    if (kind === "brute") {
-      minL += 1;
-      maxL += 1;
-    }
-    if (kind === "scout") maxL = Math.max(minL, maxL - 1);
     const alive = this.enemies.map((e) => e.word);
-    let entry: Entry = pickEntry(this.lang, minL, maxL, alive, kind === "boss");
+    let entry: Entry;
     let power: Power | null = null;
-    const powerFree = !this.enemies.some((e) => e.power);
-    if (kind !== "boss" && this.wave >= 2 && powerFree && Math.random() < 0.16) {
-      const options: Power[] = ["shield", "slow", "nova"];
-      const choice = options[Math.floor(Math.random() * options.length)]!;
-      const word = POWER_WORDS[this.lang][choice];
-      if (!conflicts(word.word, alive)) {
-        entry = word;
-        power = choice;
+    if (this.mode === "letter") {
+      entry = { word: this.pickLetter(alive), display: "", hanzi: null };
+      const powerFree = !this.enemies.some((e) => e.power);
+      if (kind !== "boss" && this.wave >= 2 && powerFree && Math.random() < 0.14) {
+        const options: Power[] = ["shield", "slow", "nova"];
+        power = options[Math.floor(Math.random() * options.length)]!;
+      }
+    } else {
+      let [minL, maxL] = lenRange(this.diff, this.wave, kind === "boss");
+      if (kind === "brute") {
+        minL += 1;
+        maxL += 1;
+      }
+      if (kind === "scout") maxL = Math.max(minL, maxL - 1);
+      entry = pickEntry(this.lang, minL, maxL, alive, kind === "boss");
+      const powerFree = !this.enemies.some((e) => e.power);
+      if (kind !== "boss" && this.wave >= 2 && powerFree && Math.random() < 0.16) {
+        const options: Power[] = ["shield", "slow", "nova"];
+        const choice = options[Math.floor(Math.random() * options.length)]!;
+        const word = POWER_WORDS[this.lang][choice];
+        if (!conflicts(word.word, alive)) {
+          entry = word;
+          power = choice;
+        }
       }
     }
+    const hp = this.mode === "letter" && kind === "boss" ? Math.min(5, 2 + Math.floor(this.wave / 5)) : 1;
     let x = 0.2 + Math.random() * 0.6;
     for (let n = 0; n < 8; n++) {
       const tryX = 0.14 + Math.random() * 0.72;
@@ -465,8 +531,17 @@ export class Game {
       word: entry.word,
       hanzi: entry.hanzi,
       power,
+      hp,
+      maxHp: hp,
     });
     this.spawned += 1;
+  }
+
+  private pickLetter(alive: string[]) {
+    const used = new Set(alive);
+    const free = "abcdefghijklmnopqrstuvwxyz".split("").filter((ch) => !used.has(ch));
+    const pool = free.length ? free : "abcdefghijklmnopqrstuvwxyz".split("");
+    return pool[Math.floor(Math.random() * pool.length)]!;
   }
 
   private separate() {
@@ -502,7 +577,8 @@ export class Game {
     this.maxCombo = Math.max(this.maxCombo, this.combo);
     const mult = 1 + (this.combo - 1) * 0.14;
     const diffM = this.diff === "easy" ? 0.85 : this.diff === "normal" ? 1 : 1.35;
-    let pts = Math.round(enemy.word.length * 22 * mult * diffM);
+    const base = this.mode === "letter" ? 42 : enemy.word.length * 22;
+    let pts = Math.round(base * mult * diffM);
     if (enemy.kind === "boss") pts = Math.round(pts * 2.6);
     if (enemy.power) pts = Math.round(pts * 1.2);
     this.score += pts;

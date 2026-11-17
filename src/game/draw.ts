@@ -93,7 +93,8 @@ function drawLabel(
   error: boolean,
 ) {
   const letters = (enemy.hanzi ? enemy.word : enemy.word.toUpperCase()).split("");
-  let gap = Math.min(26, Math.max(15, cw * 0.02));
+  const single = letters.length === 1;
+  let gap = single ? 42 : Math.min(26, Math.max(15, cw * 0.02));
   let total = letters.length * gap;
   const maxTotal = cw * 0.86;
   if (total > maxTotal) {
@@ -102,10 +103,11 @@ function drawLabel(
   }
   const hanzi = enemy.hanzi;
   const hint = enemy.power ? POWER_HINT[enemy.power as Power] : "";
-  const size = Math.max(13, gap * 0.92);
+  const size = single ? Math.max(28, cw * 0.045) : Math.max(13, gap * 0.92);
   const hanziSize = Math.max(15, size * 1.05);
   const hintSize = 11;
-  const plateH = size + 16 + (hanzi ? hanziSize + 4 : 0) + (hint ? hintSize + 4 : 0);
+  const pips = enemy.maxHp > 1;
+  const plateH = size + 16 + (hanzi ? hanziSize + 4 : 0) + (hint ? hintSize + 4 : 0) + (pips ? 12 : 0);
   const plateW = Math.max(total + 22, hanzi ? hanzi.length * hanziSize + 22 : 0, hint.length * hintSize + 18);
   let left = x - plateW / 2;
   left = Math.max(8, Math.min(cw - plateW - 8, left));
@@ -142,6 +144,17 @@ function drawLabel(
     ctx.font = `600 ${hintSize}px ${FONT}`;
     ctx.fillStyle = "#ffb347";
     ctx.fillText(hint, left + plateW / 2, cursor + size + 3);
+  }
+  if (pips) {
+    const pipY = top + plateH - 10;
+    const pipGap = 10;
+    const pipStart = left + plateW / 2 - ((enemy.maxHp - 1) * pipGap) / 2;
+    for (let i = 0; i < enemy.maxHp; i++) {
+      ctx.beginPath();
+      ctx.arc(pipStart + i * pipGap, pipY, 3, 0, Math.PI * 2);
+      ctx.fillStyle = i < enemy.hp ? "#ffb347" : "rgba(231,243,255,0.25)";
+      ctx.fill();
+    }
   }
   ctx.restore();
   return { top, plateH, plateW };
